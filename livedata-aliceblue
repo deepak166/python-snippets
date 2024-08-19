@@ -1,0 +1,45 @@
+from alice_blue import AliceBlue, LiveFeedType
+import time
+
+# authentication script
+
+latest_ltp = None  # Variable to store the latest LTP
+
+def event_handler_quote_update(message):
+    global latest_ltp
+    # Fetch and update the latest LTP (Last Traded Price)
+    latest_ltp = message['ltp']
+
+def open_callback():
+    global socket_opened
+    socket_opened = True
+
+# Start WebSocket session
+alice.start_websocket(socket_open_callback=open_callback,
+                      event_handler_quote_update=event_handler_quote_update,
+                      run_in_background=True)
+
+# Wait until the WebSocket connection is opened
+while not socket_opened:
+    time.sleep(1)
+
+# Fetch Nifty50 current price to determine +2ITM strike price
+nifty50_instrument = alice.get_instrument_by_symbol('NSE', 'NIFTY 50')
+nifty50_data = alice.get_ltp(nifty50_instrument)
+nifty50_current_price = nifty50_data['ltp']
+
+# Calculate the +2ITM strike price
+strike_price = int(nifty50_current_price / 50 + 2) * 50
+
+# Fetch the option instrument for the calculated strike price
+option_symbol = f'NIFTY{strike_price}CE'  # Assuming a Call Option
+option_instrument = alice.get_instrument_by_symbol('NFO', option_symbol)
+
+# Subscribe to live feed for the option
+alice.subscribe(option_instrument, LiveFeedType.MARKET_DATA)
+
+# Keep the script running and print the LTP every second
+while True:
+    if latest_ltp is not None:
+        print(f"Your LTP is: {latest_ltp}")
+    time.sleep(1)  # Wait for 1 second before printing the next LTP
